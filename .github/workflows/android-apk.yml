@@ -1,0 +1,57 @@
+name: Emu293 Android APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["android-core-refactor"]
+    paths:
+      - "android/**"
+      - "android-project/**"
+      - "src/**"
+      - ".github/workflows/android-apk.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  build-apk:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - name: Check out Emu293
+        uses: actions/checkout@v4
+
+      - name: Check out SDL2 Android Java sources
+        uses: actions/checkout@v4
+        with:
+          repository: libsdl-org/SDL
+          ref: release-2.30.11
+          path: third_party/SDL
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Android SDK and NDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install NDK and CMake
+        run: |
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --install "ndk;27.2.12479018" "cmake;3.22.1"
+          test -f "$ANDROID_HOME/ndk/27.2.12479018/build/cmake/android.toolchain.cmake"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Build debug APK
+        run: gradle --no-daemon --stacktrace -p android-project :app:assembleDebug
+
+      - name: Upload debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: emu293-android-arm64-debug
+          path: android-project/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
