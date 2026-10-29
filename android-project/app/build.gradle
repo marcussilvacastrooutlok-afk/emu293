@@ -19,7 +19,7 @@ android {
             cmake {
                 cppFlags '-std=c++11'
                 arguments '-DANDROID_STL=c++_static',
-                          "-DSDL2_SOURCE_DIR=${rootProject.projectDir.parentFile}/../third_party/SDL"
+                          "-DSDL2_SOURCE_DIR=${rootProject.projectDir}/../third_party/SDL"
                 targets 'main'
             }
         }
