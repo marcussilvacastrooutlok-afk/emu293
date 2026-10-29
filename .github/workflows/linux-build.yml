@@ -3,12 +3,12 @@ name: Emu293 Linux build check
 on:
   workflow_dispatch:
   pull_request:
-    branches: ["main", "master"]
+    branches: ["main", "master", "android-core-refactor"]
     paths:
       - "src/**"
       - ".github/workflows/linux-build.yml"
   push:
-    branches: ["main", "master", "ci/linux-build-check"]
+    branches: ["main", "master", "ci/linux-build-check", "android-core-refactor"]
     paths:
       - "src/**"
       - ".github/workflows/linux-build.yml"
