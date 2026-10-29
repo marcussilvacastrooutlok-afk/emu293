@@ -1,49 +1,37 @@
 # Android port status
 
-This directory tracks the Android port separately from the desktop build.
+## Verified
 
-## Current status
+- GitHub Actions Linux build passed on 2026-10-29 for commit `6432ac712f0b01747d696d38b4f8134ca5fca049`.
+- The log confirms that the desktop `emu293` executable linked successfully after the core extraction.
+- `src/boot_config.h`, `src/emulator_core.h`, and `src/emulator_core.cpp` provide shared boot settings and a reusable `Emu293::RunEmulator(const BootConfig&)` entry point.
+- `android/CMakeLists.txt` is an initial NDK core build definition. It deliberately excludes the desktop wxWidgets frontend and Linux V4L2 webcam source, using `android/webcam_stub.cpp` for now.
 
-The Linux source build is verified by `.github/workflows/linux-build.yml`. An Android APK has **not** been produced yet.
+A successful Linux build is not an Android build, and no APK has been produced or device-tested yet.
 
-The existing desktop executable cannot be built as-is for Android because its startup code depends on wxWidgets (`wxApp`, `wxMessageBox`, and `wxSingleChoiceDialog`) and its camera implementation depends on Linux V4L2/libv4l2. The desktop Makefile also invokes `wx-config` and links `-lv4l2 -lv4lconvert` unconditionally.
+## Android work still required
 
-## Findings from source inspection
+1. Integrate an Android-compatible SDL2 source/package and validate the CMake target with the Android NDK.
+2. Add the Android app/activity and JNI entry point that calls `Emu293::RunEmulator`.
+3. Replace the wxWidgets platform picker with an Android UI and Storage Access Framework document selection for the boot image and SD-card image.
+4. Copy selected document contents into app-private storage when the core needs normal filesystem paths. Put save states in a writable app-private directory.
+5. Keep the Linux V4L2 webcam implementation excluded initially. Camera emulation remains disabled until a proper Android Camera2/NDK backend is implemented.
+6. Add touch controls while preserving SDL game-controller support for USB and Bluetooth controllers.
+7. Add an Android ARM64 GitHub Actions build that uploads the APK as an artifact.
+8. Install and test the resulting APK on an Android device; check startup, rendering, audio, touch, and external controllers before calling it functional.
 
-- `src/emu293.cpp` currently mixes command-line parsing, the wxWidgets platform picker, ROM/NOR/SD-card path resolution, core initialization, and the CPU execution loop in one file.
-- The platform picker assumes the ROMs directory is available through relative filesystem paths. Android must instead resolve user-selected documents and keep save states in app-private storage.
-- `src/video/csi.cpp` calls the webcam API even if the user is not actively using a camera. The Android target must compile `android/webcam_stub.cpp` rather than the Linux V4L2 implementation until a proper Android camera backend exists.
-- SDL2 rendering/audio and the initial SDL game-controller mapping are present, but have only been validated by the Linux build. Android touch/controller behavior is not yet device-tested.
+## Current source constraints
 
-## Android port requirements
+- The desktop `src/emu293.cpp` still contains wxWidgets startup/selection code and is not part of the Android target.
+- The Android CMake file currently builds only a core library. It expects an SDL2 CMake package to be supplied by the Android build integration and does not yet create an APK.
+- The core expects ordinary filesystem paths for the SD-card image and boot image. Android document URIs cannot be passed directly without copying or adapting file access.
+- The app must not bundle copyrighted ROM/system images. Users supply their own SD-card image and ELF/NOR boot image for a supported platform.
 
-1. Use SDL2's Android project/activity and Android NDK/CMake; do not use the desktop Makefile.
-2. Extract boot configuration and the emulator run loop from `src/emu293.cpp` into reusable core code, leaving the wxWidgets picker in a desktop-only frontend.
-3. Replace the wxWidgets platform picker with an Android document picker or a small Android UI. Use Android's Storage Access Framework so users can select their own SD-card image and boot image without broad storage permissions.
-4. Copy selected document content into app-private storage when necessary, because the emulator currently expects ordinary filesystem paths. Store save states in a writable app-private directory.
-5. Exclude the Linux V4L2 webcam implementation on Android initially. Keep CSI camera emulation disabled/stubbed until an Android Camera2/NDK integration exists.
-6. Add touch controls and SDL game-controller support without removing the existing keyboard mapping.
-7. Build an ARM64 APK in GitHub Actions, upload it as an Actions artifact, and only then report an APK as available. A successful compile is not the same as a device runtime test.
+## Next implementation order
 
-## Immediate implementation order
+1. Integrate SDL2 Android and validate the core library using NDK CMake.
+2. Add a minimal Android activity/JNI bridge and file-selection flow.
+3. Add the APK packaging workflow and publish a test artifact.
+4. Fix actual NDK compile/link errors, then device-test and add controls.
 
-- **Step 1 — boot configuration (partial):** `src/boot_config.h` now defines platform-neutral boot settings, and `src/emu293.cpp` uses them. This also initializes the NOR/iGame flags to `false`. The emulator execution loop is still coupled to the desktop startup file, so the reusable entry point is not complete yet.
-- **Step 1b — extract the core entry point:** move core initialization, execution loop, and shutdown into a reusable function that accepts `BootConfig`. Keep argument parsing and the wxWidgets picker in a desktop-only frontend. Do not begin APK packaging until this compiles on Linux.
-- **Step 2 — add Android startup:** connect SDL's Android activity to the reusable entry point and provide a file-selection flow for the boot image and SD-card image.
-- **Step 3 — add the NDK build:** compile the core with CMake, SDL2 Android, and `android/webcam_stub.cpp`; exclude wxWidgets and V4L2.
-- **Step 4 — validate:** run CI, fix compile/link errors, produce an ARM64 APK artifact, then test install/launch and controls on an Android device.
-
-The repository currently disables GitHub Issues, so the porting checklist is kept here rather than in a new issue.
-
-## Required user files
-
-The app must not bundle copyrighted ROM/system images. Users supply the required SD-card image and ELF/NOR boot image for a supported platform themselves. Refer to the root README for the expected filenames and platform-specific details.
-
-
-## Core extraction update (2026-10-29)
-
-- Added `src/emulator_core.h` with the reusable `RunEmulator(const BootConfig&)` entry point.
-- Added `src/emulator_core.cpp` containing the CPU startup, ELF/NOR/iGame loading, device ticking, save-state handling, and shutdown loop using the shared boot configuration.
-- The desktop `main()` now delegates to `RunEmulator` after its existing wxWidgets/CLI selection logic.
-- The Linux build workflow now watches `android-core-refactor` so this branch can be compile-checked after changes.
-- Important: this is a first extraction, not proof of a successful build or a working Android app. The next checks are the Linux compile result, correcting any compile/runtime regressions, then separating SDL/platform initialization and creating the Android NDK frontend.
+Do not report an APK as available until a successful Android build produces a real artifact. Do not report runtime compatibility until the APK has been tested on a device.
