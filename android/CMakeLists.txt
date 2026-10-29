@@ -1,13 +1,25 @@
 cmake_minimum_required(VERSION 3.22)
 project(emu293_android LANGUAGES C CXX)
 
-# Initial NDK build scaffold. SDL2 is expected to be supplied by the SDL Android
-# project or an Android-compatible SDL2 CMake package; do not use desktop wxWidgets
-# or Linux V4L2 dependencies in this target.
+# Build SDL2 from its official source tree in CI. This keeps the Android core
+# independent from desktop wxWidgets and Linux V4L2 dependencies.
 set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS ON)
 
 set(EMU293_ROOT "${CMAKE_CURRENT_LIST_DIR}/..")
+set(SDL2_SOURCE_DIR "" CACHE PATH "Path to an SDL2 source checkout")
+
+if(NOT SDL2_SOURCE_DIR OR NOT EXISTS "${SDL2_SOURCE_DIR}/CMakeLists.txt")
+    message(FATAL_ERROR "Set SDL2_SOURCE_DIR to an SDL2 source checkout")
+endif()
+
+set(SDL_TEST OFF CACHE BOOL "" FORCE)
+set(SDL_TESTS OFF CACHE BOOL "" FORCE)
+set(SDL_SHARED OFF CACHE BOOL "" FORCE)
+set(SDL_STATIC ON CACHE BOOL "" FORCE)
+set(SDL_INSTALL OFF CACHE BOOL "" FORCE)
+add_subdirectory("${SDL2_SOURCE_DIR}" "${CMAKE_BINARY_DIR}/SDL2" EXCLUDE_FROM_ALL)
 
 set(EMU293_CORE_SOURCES
     "${EMU293_ROOT}/src/emulator_core.cpp"
@@ -39,8 +51,13 @@ add_library(emu293_core STATIC ${EMU293_CORE_SOURCES})
 target_include_directories(emu293_core PUBLIC "${EMU293_ROOT}/src")
 target_compile_options(emu293_core PRIVATE -Wall -Wextra)
 
-find_package(SDL2 CONFIG REQUIRED)
-target_link_libraries(emu293_core PUBLIC SDL2::SDL2 z)
+if(TARGET SDL2::SDL2)
+    target_link_libraries(emu293_core PUBLIC SDL2::SDL2 z)
+elseif(TARGET SDL2-static)
+    target_link_libraries(emu293_core PUBLIC SDL2-static z)
+else()
+    message(FATAL_ERROR "SDL2 source did not define a recognized SDL2 library target")
+endif()
 
-# The Android app must provide its own SDL entry point/JNI bridge and call
-# Emu293::RunEmulator with paths copied into app-private storage.
+# This target validates the ARM64 core only; Android activity/JNI and APK
+# packaging are separate pending steps. The app must call Emu293::RunEmulator.
