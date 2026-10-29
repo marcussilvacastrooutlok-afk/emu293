@@ -38,3 +38,12 @@ The repository currently disables GitHub Issues, so the porting checklist is kep
 ## Required user files
 
 The app must not bundle copyrighted ROM/system images. Users supply the required SD-card image and ELF/NOR boot image for a supported platform themselves. Refer to the root README for the expected filenames and platform-specific details.
+
+
+## Core extraction update (2026-10-29)
+
+- Added `src/emulator_core.h` with the reusable `RunEmulator(const BootConfig&)` entry point.
+- Added `src/emulator_core.cpp` containing the CPU startup, ELF/NOR/iGame loading, device ticking, save-state handling, and shutdown loop using the shared boot configuration.
+- The desktop `main()` now delegates to `RunEmulator` after its existing wxWidgets/CLI selection logic.
+- The Linux build workflow now watches `android-core-refactor` so this branch can be compile-checked after changes.
+- Important: this is a first extraction, not proof of a successful build or a working Android app. The next checks are the Linux compile result, correcting any compile/runtime regressions, then separating SDL/platform initialization and creating the Android NDK frontend.
