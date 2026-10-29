@@ -139,7 +139,7 @@ int RunEmulator(const BootConfig &config) {
       }
       if (savestate_flag != -1 || loadstate_flag != -1) {
         bool is_save = (savestate_flag != -1);
-        auto file = state_file(is_save ? savestate_flag : loadstate_flag);
+        auto file = state_file(config.save_directory, is_save ? savestate_flag : loadstate_flag);
         SaveStater ss; 
         if(is_save ? ss.begin_save(file) : ss.begin_load(file)) {
           ss.i(icount);
