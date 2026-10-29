@@ -25,6 +25,7 @@ set(EMU293_CORE_SOURCES
     "${EMU293_ROOT}/src/sys/irq.cpp"
     "${EMU293_ROOT}/src/sys/miu.cpp"
     "${EMU293_ROOT}/src/sys/timer.cpp"
+    "${EMU293_ROOT}/src/video/csi.cpp"
     "${EMU293_ROOT}/src/video/ppu.cpp"
     "${EMU293_ROOT}/src/video/tve.cpp"
     "${EMU293_ROOT}/android/webcam_stub.cpp"
