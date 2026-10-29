@@ -11,10 +11,12 @@
 #include "io/igame_rf.h"
 #include "audio/spu.h"
 #include "system.h"
+#include "sys/gpio.h"
 #include <SDL2/SDL.h>
 #include <algorithm>
 #include <chrono>
 #include <cstdio>
+#include <cstdlib>
 
 namespace Emu293 {
 namespace {
