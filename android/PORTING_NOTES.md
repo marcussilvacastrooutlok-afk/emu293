@@ -27,7 +27,8 @@ The existing desktop executable cannot be built as-is for Android because its st
 
 ## Immediate implementation order
 
-- **Step 1 — separate startup from the core:** introduce a platform-neutral boot configuration (boot image path, SD image path, NOR/iGame flags, save-state directory) and a reusable emulator entry point. Preserve the current desktop CLI and picker behavior.
+- **Step 1 — boot configuration (partial):** `src/boot_config.h` now defines platform-neutral boot settings, and `src/emu293.cpp` uses them. This also initializes the NOR/iGame flags to `false`. The emulator execution loop is still coupled to the desktop startup file, so the reusable entry point is not complete yet.
+- **Step 1b — extract the core entry point:** move core initialization, execution loop, and shutdown into a reusable function that accepts `BootConfig`. Keep argument parsing and the wxWidgets picker in a desktop-only frontend. Do not begin APK packaging until this compiles on Linux.
 - **Step 2 — add Android startup:** connect SDL's Android activity to the reusable entry point and provide a file-selection flow for the boot image and SD-card image.
 - **Step 3 — add the NDK build:** compile the core with CMake, SDL2 Android, and `android/webcam_stub.cpp`; exclude wxWidgets and V4L2.
 - **Step 4 — validate:** run CI, fix compile/link errors, produce an ARM64 APK artifact, then test install/launch and controls on an Android device.
