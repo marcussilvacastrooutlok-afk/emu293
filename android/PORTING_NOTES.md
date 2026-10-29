@@ -5,7 +5,8 @@
 - GitHub Actions Linux build passed on 2026-10-29 for commit `6432ac712f0b01747d696d38b4f8134ca5fca049`.
 - The log confirms that the desktop `emu293` executable linked successfully after the core extraction.
 - `src/boot_config.h`, `src/emulator_core.h`, and `src/emulator_core.cpp` provide shared boot settings and a reusable `Emu293::RunEmulator(const BootConfig&)` entry point.
-- `android/CMakeLists.txt` is an initial NDK core build definition. It deliberately excludes the desktop wxWidgets frontend and Linux V4L2 webcam source, using `android/webcam_stub.cpp` for now.
+- `android/CMakeLists.txt` defines the ARM64 core build using SDL2 built from source. It deliberately excludes the desktop wxWidgets frontend and Linux V4L2 webcam source, using `android/webcam_stub.cpp` for now.
+- `.github/workflows/android-core-build.yml` now configures and compiles the core for `arm64-v8a` with Android NDK in GitHub Actions. The workflow result must be checked before treating the NDK build as validated.
 
 A successful Linux build is not an Android build, and no APK has been produced or device-tested yet.
 
@@ -29,7 +30,7 @@ A successful Linux build is not an Android build, and no APK has been produced o
 
 ## Next implementation order
 
-1. Integrate SDL2 Android and validate the core library using NDK CMake.
+1. Validate the SDL2/NDK ARM64 core build in GitHub Actions.
 2. Add a minimal Android activity/JNI bridge and file-selection flow.
 3. Add the APK packaging workflow and publish a test artifact.
 4. Fix actual NDK compile/link errors, then device-test and add controls.
