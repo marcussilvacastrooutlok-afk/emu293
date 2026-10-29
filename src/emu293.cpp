@@ -18,6 +18,7 @@
 #include "audio/spu.h"
 
 #include "system.h"
+#include "boot_config.h"
 #include <SDL2/SDL.h>
 #include <ctime>
 #include <chrono>
@@ -41,12 +42,13 @@ using namespace Emu293;
 
 
 namespace {
-std::string webcam_dev;
-std::string elf_file;
-std::string sd_card;
-std::string save_dir = "../roms";
-
-bool nor_boot, igame_boot;
+BootConfig boot_config;
+std::string &webcam_dev = boot_config.webcam_device;
+std::string &elf_file = boot_config.boot_image;
+std::string &sd_card = boot_config.sd_card_image;
+std::string &save_dir = boot_config.save_directory;
+bool &nor_boot = boot_config.boot_from_nor;
+bool &igame_boot = boot_config.boot_igame;
 
 void null_configure() {};
 void zone3d_configure() { zone3d_pad_mode = true; }
