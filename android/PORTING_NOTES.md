@@ -6,13 +6,13 @@
 - The log confirms that the desktop `emu293` executable linked successfully after the core extraction.
 - `src/boot_config.h`, `src/emulator_core.h`, and `src/emulator_core.cpp` provide shared boot settings and a reusable `Emu293::RunEmulator(const BootConfig&)` entry point.
 - `android/CMakeLists.txt` defines the ARM64 core build using SDL2 built from source. It deliberately excludes the desktop wxWidgets frontend and Linux V4L2 webcam source, using `android/webcam_stub.cpp` for now.
-- `.github/workflows/android-core-build.yml` now configures and compiles the core for `arm64-v8a` with Android NDK in GitHub Actions. The workflow result must be checked before treating the NDK build as validated.
+- `.github/workflows/android-core-build.yml` successfully configured and compiled the core for `arm64-v8a` with Android NDK in GitHub Actions on 2026-10-29, commit `4ea4eea154a7247f2008b7f261f488ea8b458d17` (run [40924577126](https://github.com/marcussilvacastrooutlok-afk/emu293/actions/runs/40924577126)). The NDK installation, CMake configure, and core compile steps all passed.
 
-A successful Linux build is not an Android build, and no APK has been produced or device-tested yet.
+This validates the Android ARM64 static core build only. No APK has been produced or device-tested yet.
 
 ## Android work still required
 
-1. Integrate an Android-compatible SDL2 source/package and validate the CMake target with the Android NDK.
+1. Add an Android app/activity, manifest, and JNI entry point that links SDL2 and calls `Emu293::RunEmulator`.
 2. Add the Android app/activity and JNI entry point that calls `Emu293::RunEmulator`.
 3. Replace the wxWidgets platform picker with an Android UI and Storage Access Framework document selection for the boot image and SD-card image.
 4. Copy selected document contents into app-private storage when the core needs normal filesystem paths. Put save states in a writable app-private directory.
@@ -30,9 +30,9 @@ A successful Linux build is not an Android build, and no APK has been produced o
 
 ## Next implementation order
 
-1. Validate the SDL2/NDK ARM64 core build in GitHub Actions.
-2. Add a minimal Android activity/JNI bridge and file-selection flow.
-3. Add the APK packaging workflow and publish a test artifact.
-4. Fix actual NDK compile/link errors, then device-test and add controls.
+1. Add a minimal Android Gradle project, activity, and JNI bridge that links the validated core.
+2. Add Storage Access Framework file selection for user-provided boot and SD images.
+3. Add APK packaging in GitHub Actions and upload the generated APK as an artifact.
+4. Fix actual Android link/runtime errors, then device-test and add touch controls.
 
 Do not report an APK as available until a successful Android build produces a real artifact. Do not report runtime compatibility until the APK has been tested on a device.
