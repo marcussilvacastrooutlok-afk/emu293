@@ -90,7 +90,7 @@ public final class VirtualPadView extends View {
     private int stickMask(float x,float y) {
         float dx=x-stickX,dy=y-stickY,dist=(float)Math.hypot(dx,dy);
         if(dist<stickRadius*.22f)return 0;
-        float a=Math.atan2(dy,dx), threshold=Math.PI/8;
+        double a=Math.atan2(dy,dx), threshold=Math.PI/8;
         int m=0;
         if(a>=-3*threshold && a<3*threshold)m|=1<<3;
         if(a>=threshold && a<7*threshold)m|=1<<1;
