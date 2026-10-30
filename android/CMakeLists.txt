@@ -49,7 +49,8 @@ set(EMU293_CORE_SOURCES
 
 add_library(emu293_core STATIC ${EMU293_CORE_SOURCES})
 target_include_directories(emu293_core PUBLIC "${EMU293_ROOT}/src")
-target_compile_options(emu293_core PRIVATE -Wall -Wextra)
+# Keep Debug symbols for diagnosis, but optimize the emulation hot path on ARM64.
+target_compile_options(emu293_core PRIVATE -Wall -Wextra -O2)
 
 if(TARGET SDL2::SDL2)
     target_link_libraries(emu293_core PUBLIC SDL2::SDL2 z)
@@ -59,8 +60,8 @@ else()
     message(FATAL_ERROR "SDL2 source did not define a recognized SDL2 library target")
 endif()
 
-# SDLActivity loads libmain.so and calls SDL_main. This shared library is the
-# native application entry point; Java Activity and APK packaging are still pending.
+# SDLActivity loads libmain.so and calls SDL_main.
 add_library(main SHARED "${CMAKE_CURRENT_LIST_DIR}/android_main.cpp")
+target_compile_options(main PRIVATE -O2)
 target_link_libraries(main PRIVATE emu293_core)
 set_target_properties(main PROPERTIES OUTPUT_NAME main)
