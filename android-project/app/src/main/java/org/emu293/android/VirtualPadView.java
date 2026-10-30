@@ -8,101 +8,114 @@ import android.util.SparseIntArray;
 import android.view.MotionEvent;
 import android.view.View;
 
+/** Touch overlay: separated D-pad, analog-style 8-way stick and action buttons. */
 public final class VirtualPadView extends View {
-    private static final int SC_UP=82, SC_DOWN=81, SC_LEFT=80, SC_RIGHT=79;
-    private static final int SC_Z=29, SC_X=27, SC_RETURN=40, SC_RSHIFT=229;
-    private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
-    private final SparseIntArray active = new SparseIntArray();
+    private static final int UP=82, DOWN=81, LEFT=80, RIGHT=79;
+    private static final int A=29, B=27, START=40, SELECT=229;
+    private static final int[] KEYS={UP,DOWN,LEFT,RIGHT,A,B,START,SELECT};
+    private final Paint p=new Paint(Paint.ANTI_ALIAS_FLAG);
+    // Pointer -> bit mask. Refcounts prevent one finger releasing a key held by another.
+    private final SparseIntArray pointers=new SparseIntArray();
+    private final int[] refs=new int[KEYS.length];
+    private float stickX,stickY,stickRadius;
 
-    public VirtualPadView(Context context) {
-        super(context);
-        setLayerType(View.LAYER_TYPE_HARDWARE, null);
+    public VirtualPadView(Context c) {
+        super(c);
+        setLayerType(View.LAYER_TYPE_HARDWARE,null);
         setFocusable(false);
     }
-
-    private void circle(Canvas c, float x, float y, float r, String label, boolean pressed) {
-        paint.setStyle(Paint.Style.FILL);
-        paint.setColor(pressed ? 0xBFFFFFFF : 0x70808080);
-        c.drawCircle(x, y, r, paint);
-        paint.setStyle(Paint.Style.STROKE);
-        paint.setStrokeWidth(Math.max(2f, r * 0.07f));
-        paint.setColor(0xCFFFFFFF);
-        c.drawCircle(x, y, r, paint);
-        paint.setStyle(Paint.Style.FILL);
-        paint.setTypeface(Typeface.create("sans-serif", Typeface.BOLD));
-        paint.setTextAlign(Paint.Align.CENTER);
-        paint.setTextSize(r * 0.72f);
-        paint.setColor(0xFFFFFFFF);
-        c.drawText(label, x, y + paint.getTextSize() * 0.34f, paint);
-    }
-
-    private boolean isPressed(int scan) {
-        for (int i=0;i<active.size();i++) if(active.valueAt(i)==scan) return true;
-        return false;
-    }
-
-    @Override protected void onDraw(Canvas c) {
-        super.onDraw(c);
-        float w=getWidth(), h=getHeight();
-        float r=Math.min(w,h)*0.055f;
-        float dx=w*0.16f, dy=h*0.73f;
-        circle(c,dx,dy-r*1.15f,r,"▲",isPressed(SC_UP));
-        circle(c,dx,dy+r*1.15f,r,"▼",isPressed(SC_DOWN));
-        circle(c,dx-r*1.15f,dy,r,"◀",isPressed(SC_LEFT));
-        circle(c,dx+r*1.15f,dy,r,"▶",isPressed(SC_RIGHT));
-        float ax=w*0.84f, ay=h*0.72f;
-        circle(c,ax+r*1.1f,ay-r*0.75f,r*1.12f,"A",isPressed(SC_Z));
-        circle(c,ax-r*1.1f,ay+r*0.75f,r*1.12f,"B",isPressed(SC_X));
-        circle(c,w*0.44f,h*0.91f,r*0.72f,"SEL",isPressed(SC_RSHIFT));
-        circle(c,w*0.56f,h*0.91f,r*0.72f,"START",isPressed(SC_RETURN));
-    }
-
-    private int hit(float x,float y) {
-        float w=getWidth(),h=getHeight(),r=Math.min(w,h)*0.055f;
-        float dx=w*0.16f,dy=h*0.73f;
-        if (Math.hypot(x-dx,y-(dy-r*1.15f))<r*1.25f) return SC_UP;
-        if (Math.hypot(x-dx,y-(dy+r*1.15f))<r*1.25f) return SC_DOWN;
-        if (Math.hypot(x-(dx-r*1.15f),y-dy)<r*1.25f) return SC_LEFT;
-        if (Math.hypot(x-(dx+r*1.15f),y-dy)<r*1.25f) return SC_RIGHT;
-        float ax=w*0.84f,ay=h*0.72f;
-        if (Math.hypot(x-(ax+r*1.1f),y-(ay-r*0.75f))<r*1.35f) return SC_Z;
-        if (Math.hypot(x-(ax-r*1.1f),y-(ay+r*0.75f))<r*1.35f) return SC_X;
-        if (Math.hypot(x-w*0.44f,y-h*0.91f)<r) return SC_RSHIFT;
-        if (Math.hypot(x-w*0.56f,y-h*0.91f)<r) return SC_RETURN;
+    private int bit(int key) {
+        for(int i=0;i<KEYS.length;i++) if(KEYS[i]==key) return 1<<i;
         return 0;
     }
-
-    private void updatePointer(MotionEvent e,int index) {
-        int id=e.getPointerId(index), old=active.get(id,0), next=hit(e.getX(index),e.getY(index));
-        if(old!=next) {
-            if(old!=0) Emu293SDLActivity.nativeSendKey(old,false);
-            if(next!=0) Emu293SDLActivity.nativeSendKey(next,true);
-            if(next==0) active.delete(id); else active.put(id,next);
+    private boolean pressed(int key) { int b=bit(key); return b!=0 && refs[Integer.numberOfTrailingZeros(b)]>0; }
+    private void changeMask(int id,int mask) {
+        int before=pointers.get(id,0);
+        if(before==mask) return;
+        for(int i=0;i<KEYS.length;i++) {
+            int b=1<<i;
+            if((before&b)!=0 && (mask&b)==0 && --refs[i]==0) Emu293SDLActivity.nativeSendKey(KEYS[i],false);
         }
+        for(int i=0;i<KEYS.length;i++) {
+            int b=1<<i;
+            if((before&b)==0 && (mask&b)!=0 && refs[i]++==0) Emu293SDLActivity.nativeSendKey(KEYS[i],true);
+        }
+        if(mask==0) pointers.delete(id); else pointers.put(id,mask);
+        invalidate();
     }
-
-    private void releasePointer(int id) {
-        int old=active.get(id,0);
-        if(old!=0) Emu293SDLActivity.nativeSendKey(old,false);
-        active.delete(id);
+    private void disk(Canvas c,float x,float y,float r,String label,boolean down) {
+        p.setStyle(Paint.Style.FILL); p.setColor(down?0xC0FFFFFF:0x68808080); c.drawCircle(x,y,r,p);
+        p.setStyle(Paint.Style.STROKE); p.setStrokeWidth(Math.max(2,r*.055f)); p.setColor(0xDFFFFFFF); c.drawCircle(x,y,r,p);
+        p.setStyle(Paint.Style.FILL); p.setTypeface(Typeface.create("sans-serif",Typeface.BOLD));
+        p.setTextAlign(Paint.Align.CENTER); p.setTextSize(Math.max(12,r*.58f)); p.setColor(0xFFFFFFFF);
+        c.drawText(label,x,y+p.getTextSize()*.34f,p);
     }
-
+    private float unit() { return Math.min(getWidth(),getHeight()); }
+    @Override protected void onDraw(Canvas c) {
+        super.onDraw(c);
+        float w=getWidth(),h=getHeight(),u=unit();
+        // D-pad has generous gaps and a larger footprint to avoid the cramped cluster.
+        float r=u*.065f, cx=w*.145f, cy=h*.70f, gap=r*1.55f;
+        disk(c,cx,cy-gap,r,"▲",pressed(UP)); disk(c,cx,cy+gap,r,"▼",pressed(DOWN));
+        disk(c,cx-gap,cy,r,"◀",pressed(LEFT)); disk(c,cx+gap,cy,r,"▶",pressed(RIGHT));
+        // Analog-style stick, positioned independently between D-pad and game buttons.
+        stickX=w*.405f; stickY=h*.70f; stickRadius=u*.115f;
+        p.setStyle(Paint.Style.FILL); p.setColor(0x50808080); c.drawCircle(stickX,stickY,stickRadius,p);
+        p.setStyle(Paint.Style.STROKE); p.setStrokeWidth(Math.max(2,u*.004f)); p.setColor(0xBFFFFFFF);
+        c.drawCircle(stickX,stickY,stickRadius,p);
+        p.setStyle(Paint.Style.FILL); p.setColor(0xBFC0C0C0);
+        c.drawCircle(stickX,stickY,stickRadius*.34f,p);
+        float ax=w*.85f, ay=h*.69f, ar=u*.061f;
+        disk(c,ax+ar*1.2f,ay-ar*.85f,ar,"A",pressed(A));
+        disk(c,ax-ar*1.2f,ay+ar*.85f,ar,"B",pressed(B));
+        disk(c,w*.455f,h*.92f,u*.042f,"SEL",pressed(SELECT));
+        disk(c,w*.555f,h*.92f,u*.042f,"START",pressed(START));
+    }
+    private int dpadHit(float x,float y) {
+        float w=getWidth(),h=getHeight(),r=unit()*.065f,cx=w*.145f,cy=h*.70f,g=r*1.55f;
+        if(Math.hypot(x-cx,y-(cy-g))<r*1.28f)return UP;
+        if(Math.hypot(x-cx,y-(cy+g))<r*1.28f)return DOWN;
+        if(Math.hypot(x-(cx-g),y-cy)<r*1.28f)return LEFT;
+        if(Math.hypot(x-(cx+g),y-cy)<r*1.28f)return RIGHT;
+        return 0;
+    }
+    private int buttonHit(float x,float y) {
+        float w=getWidth(),h=getHeight(),u=unit(),ax=w*.85f,ay=h*.69f,r=u*.061f;
+        if(Math.hypot(x-(ax+r*1.2f),y-(ay-r*.85f))<r*1.25f)return A;
+        if(Math.hypot(x-(ax-r*1.2f),y-(ay+r*.85f))<r*1.25f)return B;
+        if(Math.hypot(x-w*.455f,y-h*.92f)<u*.05f)return SELECT;
+        if(Math.hypot(x-w*.555f,y-h*.92f)<u*.05f)return START;
+        return 0;
+    }
+    private int stickMask(float x,float y) {
+        float dx=x-stickX,dy=y-stickY,dist=(float)Math.hypot(dx,dy);
+        if(dist<stickRadius*.22f)return 0;
+        float a=Math.atan2(dy,dx), threshold=Math.PI/8;
+        int m=0;
+        if(a>=-3*threshold && a<3*threshold)m|=1<<3;
+        if(a>=threshold && a<7*threshold)m|=1<<1;
+        if(a>=5*threshold || a< -5*threshold)m|=1<<2;
+        if(a>=-7*threshold && a< -threshold)m|=1<<0;
+        return m;
+    }
+    private void update(MotionEvent e,int i) {
+        int id=e.getPointerId(i); float x=e.getX(i),y=e.getY(i);
+        int key=dpadHit(x,y); if(key==0)key=buttonHit(x,y);
+        int mask=key==0?0:bit(key);
+        float sx=getWidth()*.405f,sy=getHeight()*.70f,sr=unit()*.115f;
+        if(Math.hypot(x-sx,y-sy)<=sr*1.35f) {
+            stickX=sx;stickY=sy;stickRadius=sr;
+            mask=stickMask(x,y);
+        }
+        changeMask(id,mask);
+    }
+    private void release(int id) { changeMask(id,0); }
     @Override public boolean onTouchEvent(MotionEvent e) {
-        int action=e.getActionMasked(), index=e.getActionIndex();
-        if(action==MotionEvent.ACTION_DOWN || action==MotionEvent.ACTION_POINTER_DOWN) {
-            updatePointer(e,index); invalidate(); return true;
-        }
-        if(action==MotionEvent.ACTION_MOVE) {
-            for(int i=0;i<e.getPointerCount();i++) updatePointer(e,i);
-            invalidate(); return true;
-        }
-        if(action==MotionEvent.ACTION_UP || action==MotionEvent.ACTION_POINTER_UP) {
-            releasePointer(e.getPointerId(index)); invalidate(); return true;
-        }
-        if(action==MotionEvent.ACTION_CANCEL) {
-            for(int i=active.size()-1;i>=0;i--) releasePointer(active.keyAt(i));
-            invalidate(); return true;
-        }
+        int a=e.getActionMasked(),i=e.getActionIndex();
+        if(a==MotionEvent.ACTION_DOWN||a==MotionEvent.ACTION_POINTER_DOWN){update(e,i);return true;}
+        if(a==MotionEvent.ACTION_MOVE){for(int n=0;n<e.getPointerCount();n++)update(e,n);return true;}
+        if(a==MotionEvent.ACTION_UP||a==MotionEvent.ACTION_POINTER_UP){release(e.getPointerId(i));return true;}
+        if(a==MotionEvent.ACTION_CANCEL){for(int n=pointers.size()-1;n>=0;n--)release(pointers.keyAt(n));return true;}
         return true;
     }
 }
