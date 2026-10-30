@@ -16,7 +16,9 @@ public final class VirtualPadView extends View {
     private final Paint p=new Paint(Paint.ANTI_ALIAS_FLAG);
     // Pointer -> bit mask. Refcounts prevent one finger releasing a key held by another.
     private final SparseIntArray pointers=new SparseIntArray();
+    private final SparseIntArray dpadPointers=new SparseIntArray();
     private final int[] refs=new int[KEYS.length];
+    private final int[] dpadRefs=new int[4];
     private float stickX,stickY,stickRadius;
 
     public VirtualPadView(Context c) {
@@ -29,6 +31,19 @@ public final class VirtualPadView extends View {
         return 0;
     }
     private boolean pressed(int key) { int b=bit(key); return b!=0 && refs[Integer.numberOfTrailingZeros(b)]>0; }
+    private boolean dpadPressed(int key) {
+        int i=key==UP?0:key==DOWN?1:key==LEFT?2:key==RIGHT?3:-1;
+        return i>=0 && dpadRefs[i]>0;
+    }
+    private void setDpadPointer(int id,int key) {
+        int old=dpadPointers.get(id,0);
+        if(old==key)return;
+        int oi=old==UP?0:old==DOWN?1:old==LEFT?2:old==RIGHT?3:-1;
+        int ni=key==UP?0:key==DOWN?1:key==LEFT?2:key==RIGHT?3:-1;
+        if(oi>=0)dpadRefs[oi]--;
+        if(ni>=0)dpadRefs[ni]++;
+        if(ni<0)dpadPointers.delete(id);else dpadPointers.put(id,key);
+    }
     private void changeMask(int id,int mask) {
         int before=pointers.get(id,0);
         if(before==mask) return;
@@ -56,8 +71,8 @@ public final class VirtualPadView extends View {
         float w=getWidth(),h=getHeight(),u=unit();
         // D-pad has generous gaps and a larger footprint to avoid the cramped cluster.
         float r=u*.065f, cx=w*.145f, cy=h*.70f, gap=r*1.55f;
-        disk(c,cx,cy-gap,r,"▲",pressed(UP)); disk(c,cx,cy+gap,r,"▼",pressed(DOWN));
-        disk(c,cx-gap,cy,r,"◀",pressed(LEFT)); disk(c,cx+gap,cy,r,"▶",pressed(RIGHT));
+        disk(c,cx,cy-gap,r,"▲",dpadPressed(UP)); disk(c,cx,cy+gap,r,"▼",dpadPressed(DOWN));
+        disk(c,cx-gap,cy,r,"◀",dpadPressed(LEFT)); disk(c,cx+gap,cy,r,"▶",dpadPressed(RIGHT));
         // Analog-style stick, positioned independently between D-pad and game buttons.
         stickX=w*.405f; stickY=h*.70f; stickRadius=u*.115f;
         p.setStyle(Paint.Style.FILL); p.setColor(0x50808080); c.drawCircle(stickX,stickY,stickRadius,p);
@@ -100,7 +115,9 @@ public final class VirtualPadView extends View {
     }
     private void update(MotionEvent e,int i) {
         int id=e.getPointerId(i); float x=e.getX(i),y=e.getY(i);
-        int key=dpadHit(x,y); if(key==0)key=buttonHit(x,y);
+        int dpadKey=dpadHit(x,y);
+        setDpadPointer(id,dpadKey);
+        int key=dpadKey; if(key==0)key=buttonHit(x,y);
         int mask=key==0?0:bit(key);
         float sx=getWidth()*.405f,sy=getHeight()*.70f,sr=unit()*.115f;
         if(Math.hypot(x-sx,y-sy)<=sr*1.35f) {
@@ -109,7 +126,7 @@ public final class VirtualPadView extends View {
         }
         changeMask(id,mask);
     }
-    private void release(int id) { changeMask(id,0); }
+    private void release(int id) { setDpadPointer(id,0); changeMask(id,0); }
     @Override public boolean onTouchEvent(MotionEvent e) {
         int a=e.getActionMasked(),i=e.getActionIndex();
         if(a==MotionEvent.ACTION_DOWN||a==MotionEvent.ACTION_POINTER_DOWN){update(e,i);return true;}
