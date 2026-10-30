@@ -69,11 +69,9 @@ public final class VirtualPadView extends View {
     @Override protected void onDraw(Canvas c) {
         super.onDraw(c);
         float w=getWidth(),h=getHeight(),u=unit();
-        // D-pad has generous gaps and a larger footprint to avoid the cramped cluster.
         float r=u*.065f, cx=w*.145f, cy=h*.70f, gap=r*1.55f;
         disk(c,cx,cy-gap,r,"▲",dpadPressed(UP)); disk(c,cx,cy+gap,r,"▼",dpadPressed(DOWN));
         disk(c,cx-gap,cy,r,"◀",dpadPressed(LEFT)); disk(c,cx+gap,cy,r,"▶",dpadPressed(RIGHT));
-        // Analog-style stick, positioned independently between D-pad and game buttons.
         stickX=w*.405f; stickY=h*.70f; stickRadius=u*.115f;
         p.setStyle(Paint.Style.FILL); p.setColor(0x50808080); c.drawCircle(stickX,stickY,stickRadius,p);
         p.setStyle(Paint.Style.STROKE); p.setStrokeWidth(Math.max(2,u*.004f)); p.setColor(0xBFFFFFFF);
@@ -132,7 +130,11 @@ public final class VirtualPadView extends View {
         if(a==MotionEvent.ACTION_DOWN||a==MotionEvent.ACTION_POINTER_DOWN){update(e,i);return true;}
         if(a==MotionEvent.ACTION_MOVE){for(int n=0;n<e.getPointerCount();n++)update(e,n);return true;}
         if(a==MotionEvent.ACTION_UP||a==MotionEvent.ACTION_POINTER_UP){release(e.getPointerId(i));return true;}
-        if(a==MotionEvent.ACTION_CANCEL){for(int n=pointers.size()-1;n>=0;n--)release(pointers.keyAt(n));return true;}
+        if(a==MotionEvent.ACTION_CANCEL){
+            while(dpadPointers.size()>0) release(dpadPointers.keyAt(dpadPointers.size()-1));
+            while(pointers.size()>0) release(pointers.keyAt(pointers.size()-1));
+            return true;
+        }
         return true;
     }
 }
