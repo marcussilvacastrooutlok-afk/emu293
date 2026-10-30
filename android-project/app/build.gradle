@@ -1,0 +1,47 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'org.emu293.android'
+    compileSdk 35
+
+    defaultConfig {
+        applicationId 'org.emu293.android'
+        minSdk 24
+        targetSdk 28
+        versionCode 1
+        versionName '0.1.0'
+
+        ndk { abiFilters 'arm64-v8a' }
+
+        externalNativeBuild {
+            cmake {
+                cppFlags '-std=c++11'
+                arguments '-DANDROID_STL=c++_static',
+                          "-DSDL2_SOURCE_DIR=${rootProject.projectDir}/../third_party/SDL"
+                targets 'main'
+            }
+        }
+    }
+
+    sourceSets {
+        main.java.srcDirs += ["${rootProject.projectDir}/../third_party/SDL/android-project/app/src/main/java"]
+    }
+
+    externalNativeBuild {
+        cmake {
+            path file('../../android/CMakeLists.txt')
+            version '3.22.1'
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    packaging {
+        jniLibs { useLegacyPackaging true }
+    }
+}

@@ -18,6 +18,8 @@
 #include "audio/spu.h"
 
 #include "system.h"
+#include "boot_config.h"
+#include "emulator_core.h"
 #include <SDL2/SDL.h>
 #include <ctime>
 #include <chrono>
@@ -41,12 +43,13 @@ using namespace Emu293;
 
 
 namespace {
-std::string webcam_dev;
-std::string elf_file;
-std::string sd_card;
-std::string save_dir = "../roms";
-
-bool nor_boot, igame_boot;
+BootConfig boot_config;
+std::string &webcam_dev = boot_config.webcam_device;
+std::string &elf_file = boot_config.boot_image;
+std::string &sd_card = boot_config.sd_card_image;
+std::string &save_dir = boot_config.save_directory;
+bool &nor_boot = boot_config.boot_from_nor;
+bool &igame_boot = boot_config.boot_igame;
 
 void null_configure() {};
 void zone3d_configure() { zone3d_pad_mode = true; }
@@ -206,138 +209,5 @@ usage:
 
   }
 
-  uint32_t entryPoint, stackAddr;
-  InitPPUThreads();
-  SPUInitSound();
-  InitCSIThreads();
-  if (!SD_InitCard(sd_card.c_str())) {
-    printf("Failed to load SD card image\n");
-  }
-
-  if (!webcam_dev.empty()) {
-    webcam_init(webcam_dev);
-  }
-
-  CPU scoreCPU;
-
-  scoreCPU.reset();
-
-  //	scoreCPU.cr29 = 0x20000000;
-  auto do_load_image = [&]() {
-    if (igame_boot) {
-      if (!LoadIGameToRAM(elf_file.c_str(), entryPoint)) {
-        printf("Failed to load iGame binary\n");
-        exit(1);
-      }
-    } else if (nor_boot) {
-      if (!LoadNORToRAM(elf_file.c_str(), entryPoint, stackAddr)) {
-        printf("Failed to load NOR\n");
-        exit(1);
-      }
-      scoreCPU.r0 = stackAddr;
-    } else {
-      entryPoint = LoadElfToRAM(elf_file.c_str());
-      if (entryPoint == 0) {
-        printf("Failed to load ELF\n");
-        exit(1);
-      }
-      printf("Loaded ELF to RAM (ep=0x%08x)!\n", entryPoint);
-    }
-    scoreCPU.pc = entryPoint;
-  };
-  do_load_image();
-
-  system_init(&scoreCPU);
-  if (igame_boot) {
-    IGameRFInit();
-  }
-  write_memU32(0xFFFFFFEC, 1);
-  int icount = 0;
-  auto start = std::chrono::steady_clock::now();
-  int64_t t32k_rate = 1000000000/32768;
-  int64_t t32k_next = std::chrono::duration_cast<std::chrono::nanoseconds>(start.time_since_epoch()).count()
-    + t32k_rate;
-
-  while (1) {
-    scoreCPU.step();
-    icount++;
-
-    if ((icount % 4) == 0) {
-      TimerTick(false); // main PCLK/2
-      // SDL_Delay(1);
-    }
-
-    if ((icount % 320) == 0) {
-      if (igame_boot) {
-        IGameRFTick();
-      } else {
-        IRGamepadTick();
-      }
-    }
-
-    if ((icount % 200) == 0) {
-      SPUUpdate();
-    }
-
-
-    if ((icount % 2000) == 1000) {
-      PPUTick();
-
-      // SDL_Delay(1);
-    }
-
-    if ((icount % 2000) == 1500) {
-      TVETick();
-
-      // SDL_Delay(1);
-    }
-
-    if ((icount % 100) == 0) {
-      fflush(stdout);
-      auto t = std::chrono::steady_clock::now();
-      int64_t t_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(t.time_since_epoch()).count();
-      auto delta = std::chrono::duration<float>(t - start).count();
-
-      if (t_ns >= t32k_next) {
-        TimerTick(true); // 32kHz
-        t32k_next = std::max(t_ns+t32k_rate/2, t32k_next+t32k_rate);
-      }
-
-      if (delta > 1) {
-        printf("%.02fMIPS\n", (icount / 1000000.0) /
-                                  delta);
-        icount = 0;
-        start = t;
-        printf("PC=0x%08x\n", scoreCPU.pc);
-      }
-      if (softreset_flag) {
-        system_softreset();
-        do_load_image();
-        softreset_flag = false;
-      }
-      if (shutdown_flag) {
-        break;
-      }
-      if (savestate_flag != -1 || loadstate_flag != -1) {
-        bool is_save = (savestate_flag != -1);
-        auto file = state_file(is_save ? savestate_flag : loadstate_flag);
-        SaveStater ss; 
-        if(is_save ? ss.begin_save(file) : ss.begin_load(file)) {
-          ss.i(icount);
-          system_state(ss);
-          ss.finalise();
-          printf("%s state %s slot %d\n", (is_save ? "Saved" : "Loaded"), (is_save ? "to" : "from"),
-            is_save ? savestate_flag : loadstate_flag);
-        }
-        savestate_flag = -1;
-        loadstate_flag = -1;
-      }
-    }
-    // SDL_Delay(1);
-  }
-  ShutdownCSI();
-  ShutdownSPU();
-  webcam_stop();
-  SDL_Quit();
-  return 0;
+  return RunEmulator(boot_config);
 }
