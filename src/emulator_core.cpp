@@ -84,20 +84,25 @@ int RunEmulator(const BootConfig &config) {
     + t32k_rate;
 
   while (!quit_requested) {
-    SDL_Event event;
-    while (SDL_PollEvent(&event)) {
-      if (event.type == SDL_QUIT) {
-        quit_requested = true;
-        break;
+    // Poll Android/SDL input periodically instead of on every emulated CPU
+    // instruction. This keeps touch/controller input responsive without
+    // putting SDL event-queue overhead in the hottest emulation path.
+    if ((icount & 0x3FF) == 0) {
+      SDL_Event event;
+      while (SDL_PollEvent(&event)) {
+        if (event.type == SDL_QUIT) {
+          quit_requested = true;
+          break;
+        }
+        if (event.type == SDL_CONTROLLERDEVICEADDED) {
+          if (SDL_IsGameController(event.cdevice.which))
+            SDL_GameControllerOpen(event.cdevice.which);
+        }
+        if (config.boot_igame)
+          IGameRFEvent(&event);
+        else
+          IRGamepadEvent(&event);
       }
-      if (event.type == SDL_CONTROLLERDEVICEADDED) {
-        if (SDL_IsGameController(event.cdevice.which))
-          SDL_GameControllerOpen(event.cdevice.which);
-      }
-      if (config.boot_igame)
-        IGameRFEvent(&event);
-      else
-        IRGamepadEvent(&event);
     }
     if (quit_requested) break;
     scoreCPU.step();
