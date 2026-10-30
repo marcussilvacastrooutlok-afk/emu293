@@ -74,12 +74,32 @@ int RunEmulator(const BootConfig &config) {
   }
   write_memU32(0xFFFFFFEC, 1);
   int icount = 0;
+  bool quit_requested = false;
+  for (int device = 0; device < SDL_NumJoysticks(); ++device) {
+    if (SDL_IsGameController(device)) SDL_GameControllerOpen(device);
+  }
   auto start = std::chrono::steady_clock::now();
   int64_t t32k_rate = 1000000000/32768;
   int64_t t32k_next = std::chrono::duration_cast<std::chrono::nanoseconds>(start.time_since_epoch()).count()
     + t32k_rate;
 
-  while (1) {
+  while (!quit_requested) {
+    SDL_Event event;
+    while (SDL_PollEvent(&event)) {
+      if (event.type == SDL_QUIT) {
+        quit_requested = true;
+        break;
+      }
+      if (event.type == SDL_CONTROLLERDEVICEADDED) {
+        if (SDL_IsGameController(event.cdevice.which))
+          SDL_GameControllerOpen(event.cdevice.which);
+      }
+      if (config.boot_igame)
+        IGameRFEvent(&event);
+      else
+        IRGamepadEvent(&event);
+    }
+    if (quit_requested) break;
     scoreCPU.step();
     icount++;
 
