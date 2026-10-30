@@ -115,15 +115,9 @@ public final class VirtualPadView extends View {
         int id=e.getPointerId(i); float x=e.getX(i),y=e.getY(i);
         int dpadKey=dpadHit(x,y);
         setDpadPointer(id,dpadKey);
-        // The virtual D-pad's screen orientation is rotated relative to the
-        // controller directions expected by this device/game input path.
-        // Keep the visual highlight tied to the touched direction, and rotate
-        // only the D-pad command. The analog stick and physical pads stay unchanged.
+        // Preserve the standard D-pad mapping: Up->Up, Down->Down,
+        // Left->Left and Right->Right.
         int key=dpadKey;
-        if (key==UP) key=RIGHT;
-        else if (key==RIGHT) key=DOWN;
-        else if (key==DOWN) key=LEFT;
-        else if (key==LEFT) key=UP;
         if(key==0)key=buttonHit(x,y);
         int mask=key==0?0:bit(key);
         float sx=getWidth()*.405f,sy=getHeight()*.70f,sr=unit()*.115f;
