@@ -1,6 +1,8 @@
 #include "emulator_core.h"
 
 #include <cstdio>
+#include <jni.h>
+#include <SDL2/SDL.h>
 #include <string>
 
 extern "C" int SDL_main(int argc, char *argv[]) {
@@ -48,4 +50,19 @@ extern "C" int SDL_main(int argc, char *argv[]) {
     }
 
     return Emu293::RunEmulator(config);
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_org_emu293_android_Emu293SDLActivity_nativeSendKey(
+    JNIEnv *, jclass, jint scancode, jboolean down) {
+    SDL_Event event;
+    SDL_zero(event);
+    event.type = down ? SDL_KEYDOWN : SDL_KEYUP;
+    event.key.type = event.type;
+    event.key.state = down ? SDL_PRESSED : SDL_RELEASED;
+    event.key.repeat = 0;
+    event.key.keysym.scancode = static_cast<SDL_Scancode>(scancode);
+    event.key.keysym.sym = SDL_GetKeyFromScancode(
+        static_cast<SDL_Scancode>(scancode));
+    SDL_PushEvent(&event);
 }
