@@ -939,6 +939,31 @@ static void PPUDebug() {
 bool shutdown_flag = false;
 int savestate_flag = -1, loadstate_flag = -1;
 
+// Keep SDL GameController handles alive so button events are delivered for
+// physical USB/Bluetooth controllers on desktop and Android.
+static std::vector<SDL_GameController *> open_game_controllers;
+
+static void handle_controller_device_event(const SDL_Event &event) {
+  if (event.type == SDL_CONTROLLERDEVICEADDED) {
+    const int device_index = event.cdevice.which;
+    if (SDL_IsGameController(device_index)) {
+      SDL_GameController *controller = SDL_GameControllerOpen(device_index);
+      if (controller)
+        open_game_controllers.push_back(controller);
+    }
+  } else if (event.type == SDL_CONTROLLERDEVICEREMOVED) {
+    const SDL_JoystickID instance_id = event.cdevice.which;
+    for (auto it = open_game_controllers.begin(); it != open_game_controllers.end(); ++it) {
+      SDL_Joystick *joystick = SDL_GameControllerGetJoystick(*it);
+      if (SDL_JoystickInstanceID(joystick) == instance_id) {
+        SDL_GameControllerClose(*it);
+        open_game_controllers.erase(it);
+        break;
+      }
+    }
+  }
+}
+
 static void do_quit() {
   ShutdownPPU();
   shutdown_flag = true;
@@ -947,6 +972,7 @@ static void do_quit() {
 void PPUUpdate() {
   SDL_Event e;
   while (SDL_PollEvent(&e)) {
+    handle_controller_device_event(e);
     if (e.type == SDL_QUIT) {
       do_quit();
       break;

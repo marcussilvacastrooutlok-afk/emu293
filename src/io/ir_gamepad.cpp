@@ -196,6 +196,31 @@ namespace Emu293 {
             }
         }
         break;
+      case SDL_CONTROLLERBUTTONDOWN:
+      case SDL_CONTROLLERBUTTONUP: {
+        // SDL controller support: physical Bluetooth/USB pads, including Android.
+        uint16_t mask = 0;
+        switch (ev->cbutton.button) {
+          case SDL_CONTROLLER_BUTTON_A:      mask = BTN_A; break;
+          case SDL_CONTROLLER_BUTTON_B:      mask = BTN_B; break;
+          case SDL_CONTROLLER_BUTTON_X:      mask = BTN_M; break;
+          case SDL_CONTROLLER_BUTTON_START:  mask = BTN_START; break;
+          case SDL_CONTROLLER_BUTTON_BACK:   mask = BTN_SELECT; break;
+          case SDL_CONTROLLER_BUTTON_DPAD_UP:    mask = BTN_UP; break;
+          case SDL_CONTROLLER_BUTTON_DPAD_DOWN:  mask = BTN_DOWN; break;
+          case SDL_CONTROLLER_BUTTON_DPAD_LEFT:  mask = BTN_LEFT; break;
+          case SDL_CONTROLLER_BUTTON_DPAD_RIGHT: mask = BTN_RIGHT; break;
+          default: break;
+        }
+        if (mask != 0) {
+          if (ev->type == SDL_CONTROLLERBUTTONDOWN)
+            player_state[0] |= mask;
+          else
+            player_state[0] &= ~mask;
+          IRGamepadUpdate(1, player_state[0]);
+        }
+        break;
+      }
       }
   }
 }

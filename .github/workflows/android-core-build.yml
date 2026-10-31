@@ -1,0 +1,57 @@
+name: Emu293 Android ARM64 core build
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: ["master", "main", "android-core-refactor"]
+    paths:
+      - "android/**"
+      - "src/**"
+      - ".github/workflows/android-core-build.yml"
+  push:
+    branches: ["android-core-refactor"]
+    paths:
+      - "android/**"
+      - "src/**"
+      - ".github/workflows/android-core-build.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  android-arm64-core:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Check out Emu293
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Install Android NDK
+        run: |
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --install "ndk;27.2.12479018"
+          test -f "$ANDROID_HOME/ndk/27.2.12479018/build/cmake/android.toolchain.cmake"
+
+      - name: Check out SDL2
+        uses: actions/checkout@v4
+        with:
+          repository: libsdl-org/SDL
+          ref: release-2.30.11
+          path: third_party/SDL
+
+      - name: Configure ARM64 Android core
+        run: |
+          cmake -S android -B build/android-arm64 \
+            -DCMAKE_TOOLCHAIN_FILE="$ANDROID_HOME/ndk/27.2.12479018/build/cmake/android.toolchain.cmake" \
+            -DANDROID_ABI=arm64-v8a \
+            -DANDROID_PLATFORM=android-24 \
+            -DSDL2_SOURCE_DIR="$GITHUB_WORKSPACE/third_party/SDL"
+
+      - name: Compile ARM64 Android core
+        run: cmake --build build/android-arm64 --parallel 2
