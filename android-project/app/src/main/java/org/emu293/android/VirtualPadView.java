@@ -25,6 +25,9 @@ public final class VirtualPadView extends View {
         super(c);
         setLayerType(View.LAYER_TYPE_HARDWARE,null);
         setFocusable(false);
+        android.content.SharedPreferences prefs = c.getSharedPreferences("emu293", Context.MODE_PRIVATE);
+        setVisibility(prefs.getBoolean("touch_visible", true) ? View.VISIBLE : View.GONE);
+        setAlpha(prefs.getInt("touch_opacity", 65) / 100.0f);
     }
     private int bit(int key) {
         for(int i=0;i<KEYS.length;i++) if(KEYS[i]==key) return 1<<i;
