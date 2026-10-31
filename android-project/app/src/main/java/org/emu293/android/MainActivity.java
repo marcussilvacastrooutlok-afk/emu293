@@ -1,6 +1,7 @@
 package org.emu293.android;
 
 import android.app.Activity;
+import android.app.AlertDialog;
 import android.content.Intent;
 import android.net.Uri;
 import android.os.Bundle;
@@ -41,11 +42,49 @@ public final class MainActivity extends Activity {
         sd.setOnClickListener(v -> pick(PICK_SD));
         layout.addView(sd, new LinearLayout.LayoutParams(-1, -2));
 
+        Button settings = new Button(this);
+        settings.setText("Configurações dos controles");
+        settings.setOnClickListener(v -> showSettings());
+        layout.addView(settings, new LinearLayout.LayoutParams(-1, -2));
+
         Button start = new Button(this);
         start.setText("Iniciar Emu293");
         start.setOnClickListener(v -> startEmulator());
         layout.addView(start, new LinearLayout.LayoutParams(-1, -2));
         setContentView(layout);
+    }
+
+
+    private void showSettings() {
+        android.content.SharedPreferences prefs = getSharedPreferences("emu293", MODE_PRIVATE);
+        String[] options = {"Mostrar controles na tela", "Opacidade dos controles"};
+        new AlertDialog.Builder(this)
+                .setTitle("Configurações")
+                .setItems(options, (dialog, which) -> {
+                    if (which == 0) {
+                        boolean visible = prefs.getBoolean("touch_visible", true);
+                        prefs.edit().putBoolean("touch_visible", !visible).apply();
+                        Toast.makeText(this, "Controles na tela: " + (!visible ? "ativados" : "ocultos") + ".",
+                                Toast.LENGTH_SHORT).show();
+                    } else {
+                        String[] levels = {"45%", "65%", "85%"};
+                        int current = prefs.getInt("touch_opacity", 65);
+                        int selected = current == 45 ? 0 : current == 85 ? 2 : 1;
+                        new AlertDialog.Builder(this)
+                                .setTitle("Opacidade dos controles")
+                                .setSingleChoiceItems(levels, selected, (d, choice) -> {
+                                    int value = choice == 0 ? 45 : choice == 2 ? 85 : 65;
+                                    prefs.edit().putInt("touch_opacity", value).apply();
+                                    d.dismiss();
+                                    Toast.makeText(this, "Opacidade salva para a próxima inicialização do jogo.",
+                                            Toast.LENGTH_SHORT).show();
+                                })
+                                .setNegativeButton("Cancelar", null)
+                                .show();
+                    }
+                })
+                .setNegativeButton("Fechar", null)
+                .show();
     }
 
     private void pick(int request) {
